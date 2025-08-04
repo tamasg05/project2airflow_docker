@@ -1,0 +1,73 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+    networks:
+      - airflow_net
+
+  airflow-webserver:
+    image: apache/airflow:2.8.1
+    depends_on:
+      - postgres
+      - flask-app
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__WEBSERVER__SECRET_KEY: "my_ultra_secret_key_123"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+      APP_HOST: "http://flask-app:5001"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./titanic_train500.csv:/opt/airflow/titanic_train500.csv
+    ports:
+      - "8080:8080"
+    command: webserver
+    networks:
+      - airflow_net
+
+  airflow-scheduler:
+    image: apache/airflow:2.8.1
+    depends_on:
+      - postgres
+      - flask-app
+    environment:
+      AIRFLOW__WEBSERVER__SECRET_KEY: "my_ultra_secret_key_123"
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      APP_HOST: "http://flask-app:5001"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./titanic_train500.csv:/opt/airflow/titanic_train500.csv
+    command: scheduler
+    networks:
+      - airflow_net
+
+  flask-app:
+    build:
+      context: ../project       # path to your Flask app directory where the MLOps project is located
+      dockerfile: Dockerfile
+    container_name: flask-app
+    ports:
+      - "5001:5001"
+    environment:
+      MLFLOW_TRACKING_URI: "http://host.docker.internal:5000"
+    networks:
+      - airflow_net
+
+volumes:
+  postgres-db-volume:
+
+networks:
+  airflow_net:
