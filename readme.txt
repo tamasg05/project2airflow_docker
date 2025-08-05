@@ -5,7 +5,7 @@ The code contains a scheduled task (./dags/auto_retrain_dag.py) in AirFlow. It r
 2. AirFlow will run in different interconnected docker containers: (a) one for the AirFlow web-server, (b) one for the AirFlow scheduler, (c) one for the database: PostgreSQL. We need this setup as AirFlow does not support Windows, yet. In addition, we need the docker container the REST end point of which is called (/auto_retrain_if_drifted), this container is referenced as "flask-app" in the docker-compose.yaml file. The containers use a network named airflow_net in the docker-compose.yaml file.
 
 Please take care of the following:
-	-When you clone this project from the github repo (project2airflow_docker) place it in the same directory that contains the project: mlops_project. If you want to have it somewhere else for any reason, then change the location of the Dockerfile for the flask-app in the docker-compose.yaml
+	-When you clone this project ( https://github.com/tamasg05/project2airflow_docker.git) from the github repo, place it in the same directory that contains the project: mlops_project. If you want to have it somewhere else for any reason, then change the location of the Dockerfile for the flask-app in the docker-compose.yaml
 	
 	-Pay attention to the environment variables and volumes defined in docker-compose.yaml. Theoretically, you do not need to change them but keep this point in mind.
 	
