@@ -5,12 +5,12 @@ import requests
 from datetime import datetime, timedelta
 
 from airflow.decorators import dag, task
+from airflow.operators.empty import EmptyOperator
 
-# Set this to the actual host and port of your application (possibly from ENV)
+# Set host to Flask app service
 APP_HOST = os.getenv("APP_HOST", "http://localhost:5001")
 RETRAIN_ENDPOINT = f"{APP_HOST}/auto_retrain_if_drifted"
 
-# Default DAG arguments
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
@@ -23,14 +23,14 @@ default_args = {
 @dag(
     dag_id="auto_retrain_model_dag",
     default_args=default_args,
-    schedule_interval="*/45 * * * *",  # Every 45. minute for the demo's sake
+    schedule_interval="*/45 * * * *",
     start_date=datetime(2025, 7, 30),
     catchup=False,
     tags=["ml", "retraining"]
 )
 def auto_retrain_model():
 
-    @task(retries=0)
+    @task()
     def post_csv_to_retrain():
         csv_path = os.getenv("RETRAIN_CSV_PATH", "/opt/airflow/titanic_train500.csv")
         if not os.path.exists(csv_path):
@@ -47,7 +47,32 @@ def auto_retrain_model():
         print("Retraining result:", result)
         return result
 
-    post_csv_to_retrain()
+    @task.branch()
+    def branch_on_retraining(result: dict):
+        if result.get("retrained", False):
+            return "retraining_performed"
+        else:
+            return "no_retraining_needed"
 
-# Register the DAG
-dag = auto_retrain_model()
+    @task()
+    def retraining_performed():
+        print("A new model was trained and saved.")
+
+    @task()
+    def no_retraining_needed():
+        print("No drift detected, no model retrained.")
+
+    # Optional: End step to merge branches
+    join = EmptyOperator(task_id="join")
+
+    # DAG dependencies
+    result = post_csv_to_retrain()
+    decision = branch_on_retraining(result)
+
+    retraining_task = retraining_performed()
+    no_retraining_task = no_retraining_needed()
+
+    decision >> [retraining_task, no_retraining_task] >> join
+
+auto_retrain_model()
+

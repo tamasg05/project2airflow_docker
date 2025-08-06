@@ -1,0 +1,3 @@
+# Python cache directories
+dags/__pycache__/
+*.pyc
